@@ -99,7 +99,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       context: context,
       builder: (ctx) => CupertinoActionSheet(
         title: const Text('Paused'),
-        message: Text('${formatScore(s.score)} points · Level ${s.level}'),
+        message: Text('${formatScore(s.score)} points · Best ${formatScore(_vm.highScore)}'),
         actions: [
           CupertinoActionSheetAction(
             isDestructiveAction: true,
@@ -133,7 +133,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                 Text('Paused', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 4),
                 Text(
-                  '${formatScore(s.score)} points · Level ${s.level}',
+                  '${formatScore(s.score)} points · Best ${formatScore(_vm.highScore)}',
                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 24),
@@ -204,7 +204,13 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                                       ? Duration.zero
                                       : const Duration(milliseconds: 220),
                                   child: state.status == GameStatus.over
-                                      ? _GameOver(state: state, isApple: _isApple, onRestart: _vm.restart)
+                                      ? _GameOver(
+                                          state: state,
+                                          highScore: _vm.highScore,
+                                          isNewHighScore: _vm.isNewHighScore,
+                                          isApple: _isApple,
+                                          onRestart: _vm.restart,
+                                        )
                                       : const SizedBox.shrink(),
                                 ),
                               ],
@@ -287,9 +293,17 @@ class _ScoreBar extends StatelessWidget {
 }
 
 class _GameOver extends StatelessWidget {
-  const _GameOver({required this.state, required this.isApple, required this.onRestart});
+  const _GameOver({
+    required this.state,
+    required this.highScore,
+    required this.isNewHighScore,
+    required this.isApple,
+    required this.onRestart,
+  });
 
   final GameState state;
+  final int highScore;
+  final bool isNewHighScore;
   final bool isApple;
   final VoidCallback onRestart;
 
@@ -321,6 +335,15 @@ class _GameOver extends StatelessWidget {
             Text(
               _progressLine(state),
               style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              isNewHighScore ? 'New best score' : 'Best ${formatScore(highScore)}',
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: isNewHighScore ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+                fontFeatures: _tabular,
+              ),
             ),
             const SizedBox(height: 28),
             button,

@@ -146,11 +146,14 @@ void main() {
       expect(after.board.at(19, 0), isNull, reason: 'the full row was removed');
     });
 
-    test('tick falls, then locks at the floor', () {
+    test('tick falls, then waits on the floor until locked', () {
       var s = stateWith(Board.empty(), const ActivePiece(PieceType.o, row: 17, col: 0));
       s = game.tick(s);
       expect(s.active.row, 18);
-      s = game.tick(s);
+      expect(s.isGrounded, isTrue);
+      expect(game.tick(s), same(s));
+      expect(game.softDrop(s), same(s), reason: 'soft drop never locks');
+      s = game.lock(s);
       expect(s.board.at(19, 0), PieceType.o);
       expect(s.active.type, PieceType.t);
     });
@@ -163,7 +166,7 @@ void main() {
       ]);
       final s = stateWith(board, const ActivePiece(PieceType.o, row: 18, col: 0),
           next: PieceType.o);
-      final over = game.tick(game.tick(s));
+      final over = game.lock(game.tick(s));
       expect(over.status, GameStatus.over);
       expect(game.moveLeft(over), same(over));
     });

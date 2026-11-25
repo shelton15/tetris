@@ -37,6 +37,9 @@ class GameState {
   Duration get dropInterval =>
       Duration(milliseconds: max(80, (800 * pow(0.85, level - 1)).round()));
 
+  /// True when the active piece is resting on the floor or a block.
+  bool get isGrounded => !board.fits(active.moved(dRow: 1));
+
   /// Where the active piece would land if hard-dropped.
   ActivePiece get ghost {
     var piece = active;
@@ -99,19 +102,18 @@ class Game {
     return s;
   }
 
-  /// Gravity: drop one row, or lock the piece if it cannot fall.
+  /// Gravity: drop one row. A grounded piece stays put; settling it is
+  /// [lock]'s job, so the caller can give the player a moment to slide it.
   GameState tick(GameState s) {
-    if (s.status != GameStatus.playing) return s;
-    final down = s.active.moved(dRow: 1);
-    return s.board.fits(down) ? s.copyWith(active: down) : _lock(s);
+    if (s.status != GameStatus.playing || s.isGrounded) return s;
+    return s.copyWith(active: s.active.moved(dRow: 1));
   }
 
-  /// Player-driven drop of one row; scores 1 point per row.
+  /// Player-driven drop of one row; scores 1 point per row. Does nothing
+  /// once grounded, so holding it never locks a piece early.
   GameState softDrop(GameState s) {
-    if (s.status != GameStatus.playing) return s;
-    final down = s.active.moved(dRow: 1);
-    if (!s.board.fits(down)) return _lock(s);
-    return s.copyWith(active: down, score: s.score + 1);
+    if (s.status != GameStatus.playing || s.isGrounded) return s;
+    return s.copyWith(active: s.active.moved(dRow: 1), score: s.score + 1);
   }
 
   /// Drops straight to the ghost position and locks; 2 points per row.
@@ -119,7 +121,7 @@ class Game {
     if (s.status != GameStatus.playing) return s;
     final landed = s.ghost;
     final dropped = landed.row - s.active.row;
-    return _lock(s.copyWith(active: landed, score: s.score + 2 * dropped));
+    return lock(s.copyWith(active: landed, score: s.score + 2 * dropped));
   }
 
   GameState togglePause(GameState s) => switch (s.status) {
@@ -136,7 +138,8 @@ class Game {
 
   /// Settles the active piece, clears rows, scores, and spawns the next
   /// piece. The game ends when the new piece has no room to appear.
-  GameState _lock(GameState s) {
+  GameState lock(GameState s) {
+    if (s.status != GameStatus.playing) return s;
     final (:board, :rows) = s.board.lock(s.active).clearFullRows();
     final spawned = ActivePiece.spawn(s.next, board.width);
     return GameState(

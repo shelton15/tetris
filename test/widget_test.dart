@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tetris/game/model/game.dart';
 import 'package:tetris/game/view/board_painter.dart';
 import 'package:tetris/game/view/game_screen.dart';
@@ -23,8 +24,72 @@ Future<void> pumpScreen(WidgetTester tester, GameViewModel vm) async {
   await tester.pumpWidget(MaterialApp(home: GameScreen(viewModel: vm)));
 }
 
+/// Soft-drops until the active piece rests on the floor.
+void landPiece(GameViewModel vm) {
+  while (!vm.state.isGrounded) {
+    vm.softDrop();
+  }
+}
+
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   group('GameViewModel', () {
+    testWidgets('a grounded piece locks after the lock delay', (tester) async {
+      final vm = seededViewModel();
+      addTearDown(vm.dispose);
+      landPiece(vm);
+      final board = vm.state.board;
+      await tester.pump(GameViewModel.lockDelay - const Duration(milliseconds: 50));
+      expect(vm.state.board, same(board));
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(vm.state.board, isNot(same(board)));
+    });
+
+    testWidgets('sliding a grounded piece restarts the lock delay, up to a cap', (tester) async {
+      final vm = seededViewModel();
+      addTearDown(vm.dispose);
+      landPiece(vm);
+      final board = vm.state.board;
+      await tester.pump(const Duration(milliseconds: 400));
+      vm.moveLeft();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(vm.state.board, same(board), reason: 'the move bought more time');
+
+      for (var i = 0; i < GameViewModel.maxLockResets + 2; i++) {
+        i.isEven ? vm.moveRight() : vm.moveLeft();
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+      expect(vm.state.board, isNot(same(board)), reason: 'stalling is capped');
+    });
+
+    testWidgets('game over records a new best score', (tester) async {
+      SharedPreferences.setMockInitialValues({'high_score': 10});
+      final vm = seededViewModel();
+      addTearDown(vm.dispose);
+      await tester.pump();
+      expect(vm.highScore, 10);
+      while (vm.state.status != GameStatus.over) {
+        vm.hardDrop();
+      }
+      await tester.pump();
+      expect(vm.isNewHighScore, isTrue);
+      expect(vm.highScore, vm.state.score);
+      expect((await SharedPreferences.getInstance()).getInt('high_score'), vm.state.score);
+    });
+
+    testWidgets('a lower score keeps the saved best', (tester) async {
+      SharedPreferences.setMockInitialValues({'high_score': 1000000});
+      final vm = seededViewModel();
+      addTearDown(vm.dispose);
+      while (vm.state.status != GameStatus.over) {
+        vm.hardDrop();
+      }
+      await tester.pump();
+      expect(vm.isNewHighScore, isFalse);
+      expect(vm.highScore, 1000000);
+    });
+
     testWidgets('gravity drops the piece once per interval', (tester) async {
       final vm = seededViewModel();
       addTearDown(vm.dispose);
@@ -117,6 +182,7 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(find.text('Game over'), findsOneWidget);
+      expect(find.text('New best score'), findsOneWidget);
 
       await tester.tap(find.text('Play again'));
       await tester.pumpAndSettle();
