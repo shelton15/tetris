@@ -39,19 +39,20 @@ class Board {
     return Board._(width, height, cells);
   }
 
-  /// Removes full rows and drops the rows above them.
-  ({Board board, int cleared}) clearFullRows() {
+  /// Removes full rows and drops the rows above them. [rows] lists the
+  /// indices of the removed rows as they were before the drop.
+  ({Board board, List<int> rows}) clearFullRows() {
     final kept = <List<PieceType?>>[];
+    final rows = <int>[];
     for (var r = 0; r < height; r++) {
       final row = _cells.sublist(r * width, (r + 1) * width);
-      if (row.contains(null)) kept.add(row);
+      row.contains(null) ? kept.add(row) : rows.add(r);
     }
-    final cleared = height - kept.length;
-    if (cleared == 0) return (board: this, cleared: 0);
+    if (rows.isEmpty) return (board: this, rows: const []);
     final cells = [
-      ...List<PieceType?>.filled(cleared * width, null),
+      ...List<PieceType?>.filled(rows.length * width, null),
       for (final row in kept) ...row,
     ];
-    return (board: Board._(width, height, cells), cleared: cleared);
+    return (board: Board._(width, height, cells), rows: rows);
   }
 }
