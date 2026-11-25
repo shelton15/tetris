@@ -1,7 +1,7 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 
-import 'settings_view_model.dart';
+import '../game/view_model/settings_view_model.dart';
 
 /// Preferences, laid out with each platform's own settings conventions:
 /// inset grouped lists on Apple platforms, Material lists elsewhere.
@@ -40,7 +40,8 @@ class SettingsScreen extends StatelessWidget {
     };
     return ListenableBuilder(
       listenable: settings,
-      builder: (context, _) => isApple ? _buildCupertino(context) : _buildMaterial(context),
+      builder: (context, _) =>
+          isApple ? _buildCupertino(context) : _buildMaterial(context),
     );
   }
 
@@ -122,7 +123,12 @@ class SettingsScreen extends StatelessWidget {
     final theme = Theme.of(context);
     Widget header(String text) => Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: Text(text, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary)),
+      child: Text(
+        text,
+        style: theme.textTheme.titleSmall?.copyWith(
+          color: theme.colorScheme.primary,
+        ),
+      ),
     );
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),

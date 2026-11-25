@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'game/view/game_screen.dart';
-import 'settings/settings_view_model.dart';
+import 'game/view_model/settings_view_model.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,8 +16,13 @@ class CairnApp extends StatelessWidget {
   static ThemeData _theme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
     return ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF5B8DEF), brightness: brightness),
-      scaffoldBackgroundColor: dark ? const Color(0xFF0E0F12) : const Color(0xFFF7F7FA),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF5B8DEF),
+        brightness: brightness,
+      ),
+      scaffoldBackgroundColor: dark
+          ? const Color(0xFF0E0F12)
+          : const Color(0xFFF7F7FA),
     );
   }
 
