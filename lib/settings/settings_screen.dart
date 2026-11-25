@@ -16,6 +16,19 @@ class SettingsScreen extends StatelessWidget {
     ThemeMode.dark: 'Dark',
   };
 
+  /// Icons that show what each appearance does: half-filled for "follows
+  /// the device", sun for light, moon for dark.
+  static const _themeIconsApple = {
+    ThemeMode.system: CupertinoIcons.circle_lefthalf_fill,
+    ThemeMode.light: CupertinoIcons.sun_max_fill,
+    ThemeMode.dark: CupertinoIcons.moon_fill,
+  };
+  static const _themeIconsMaterial = {
+    ThemeMode.system: Icons.brightness_auto_rounded,
+    ThemeMode.light: Icons.light_mode_rounded,
+    ThemeMode.dark: Icons.dark_mode_rounded,
+  };
+
   static const _ghostHint = 'Outline where the falling piece will land';
   static const _hapticsHint = 'Vibrate on drops, line clears and game over';
 
@@ -54,7 +67,24 @@ class SettingsScreen extends StatelessWidget {
                         onValueChanged: (mode) {
                           if (mode != null) settings.themeMode = mode;
                         },
-                        children: {for (final e in _themeLabels.entries) e.key: Text(e.value)},
+                        children: {
+                          for (final e in _themeLabels.entries)
+                            e.key: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              // Shrinks rather than clipping at large text sizes.
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(_themeIconsApple[e.key], size: 17),
+                                    const SizedBox(width: 6),
+                                    Text(e.value),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        },
                       ),
                     ),
                   ),
@@ -102,11 +132,17 @@ class SettingsScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SegmentedButton<ThemeMode>(
+              // Keep each mode's own icon instead of swapping in a checkmark.
+              showSelectedIcon: false,
               selected: {settings.themeMode},
               onSelectionChanged: (s) => settings.themeMode = s.single,
               segments: [
                 for (final e in _themeLabels.entries)
-                  ButtonSegment(value: e.key, label: Text(e.key == ThemeMode.system ? 'System' : e.value)),
+                  ButtonSegment(
+                    value: e.key,
+                    icon: Icon(_themeIconsMaterial[e.key]),
+                    label: Text(e.key == ThemeMode.system ? 'System' : e.value),
+                  ),
               ],
             ),
           ),
