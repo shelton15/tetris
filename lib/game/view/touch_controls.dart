@@ -13,7 +13,17 @@ import '../view_model/game_view_model.dart';
 /// The axis is locked on the first movement, so a drag never both moves
 /// and drops.
 class TouchControls extends StatefulWidget {
-  const TouchControls({super.key, required this.viewModel, required this.cellSize, required this.child});
+  const TouchControls({
+    super.key,
+    required this.viewModel,
+    required this.cellSize,
+    required this.child,
+    this.enabled = true,
+  });
+
+  /// When false (the player chose on-screen buttons) the board ignores
+  /// touches and only shows [child].
+  final bool enabled;
 
   final GameViewModel viewModel;
   final double cellSize;
@@ -41,9 +51,7 @@ class _TouchControlsState extends State<TouchControls> {
 
   void _onPanUpdate(DragUpdateDetails d) {
     final delta = d.localPosition - _origin;
-    _axis ??= delta.dx.abs() > delta.dy.abs()
-        ? _Axis.horizontal
-        : (delta.dy > 0 ? _Axis.down : _Axis.none);
+    _axis ??= delta.dx.abs() > delta.dy.abs() ? _Axis.horizontal : (delta.dy > 0 ? _Axis.down : _Axis.none);
 
     final vm = widget.viewModel;
     switch (_axis!) {
@@ -76,6 +84,7 @@ class _TouchControlsState extends State<TouchControls> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.enabled) return widget.child;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: widget.viewModel.rotate,

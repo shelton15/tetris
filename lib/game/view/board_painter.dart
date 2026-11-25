@@ -141,7 +141,8 @@ class BoardPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(BoardPainter old) =>
-      !identical(old.state, state) || old.colors != colors ||
+      !identical(old.state, state) ||
+      old.colors != colors ||
       old.flashRows != flashRows ||
       old.showGhost != showGhost;
 }

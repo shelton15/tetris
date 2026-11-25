@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tetris/game/model/board.dart';
 import 'package:tetris/game/model/game.dart';
+import 'package:tetris/game/model/piece.dart';
 import 'package:tetris/game/view/board_painter.dart';
 import 'package:tetris/game/view/game_screen.dart';
 import 'package:tetris/game/view_model/game_view_model.dart';
@@ -12,13 +14,24 @@ import 'package:tetris/game/view_model/settings_view_model.dart';
 
 GameViewModel seededViewModel() => GameViewModel(game: Game(random: Random(7)));
 
+/// Starts every game with the bottom row one I-piece short of full, so the
+/// first hard drop clears a line and the game has a real score.
+class _OneLineGame extends Game {
+  _OneLineGame() : super(random: Random(7));
+
+  @override
+  GameState start({int width = 10, int height = 20}) => GameState(
+    board: Board.fromRows([for (var i = 0; i < height - 1; i++) '..........', '###....###']),
+    active: ActivePiece.spawn(PieceType.i, width),
+    next: PieceType.o,
+  );
+}
+
+GameViewModel scoringViewModel() => GameViewModel(game: _OneLineGame());
+
 /// Pumps the screen with [vm]; tears both down at the end of the test so no
 /// gravity timer is left pending.
-Future<void> pumpScreen(
-  WidgetTester tester,
-  GameViewModel vm, {
-  SettingsViewModel? settings,
-}) async {
+Future<void> pumpScreen(WidgetTester tester, GameViewModel vm, {SettingsViewModel? settings}) async {
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox());
     vm.dispose();
@@ -28,10 +41,7 @@ Future<void> pumpScreen(
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     MaterialApp(
-      home: GameScreen(
-        viewModel: vm,
-        settings: settings ?? SettingsViewModel(),
-      ),
+      home: GameScreen(viewModel: vm, settings: settings ?? SettingsViewModel()),
     ),
   );
 }
@@ -52,45 +62,32 @@ void main() {
       addTearDown(vm.dispose);
       landPiece(vm);
       final board = vm.state.board;
-      await tester.pump(
-        GameViewModel.lockDelay - const Duration(milliseconds: 50),
-      );
+      await tester.pump(GameViewModel.lockDelay - const Duration(milliseconds: 50));
       expect(vm.state.board, same(board));
       await tester.pump(const Duration(milliseconds: 60));
       expect(vm.state.board, isNot(same(board)));
     });
 
-    testWidgets(
-      'sliding a grounded piece restarts the lock delay, up to a cap',
-      (tester) async {
-        final vm = seededViewModel();
-        addTearDown(vm.dispose);
-        landPiece(vm);
-        final board = vm.state.board;
-        await tester.pump(const Duration(milliseconds: 400));
-        vm.moveLeft();
-        await tester.pump(const Duration(milliseconds: 400));
-        expect(
-          vm.state.board,
-          same(board),
-          reason: 'the move bought more time',
-        );
+    testWidgets('sliding a grounded piece restarts the lock delay, up to a cap', (tester) async {
+      final vm = seededViewModel();
+      addTearDown(vm.dispose);
+      landPiece(vm);
+      final board = vm.state.board;
+      await tester.pump(const Duration(milliseconds: 400));
+      vm.moveLeft();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(vm.state.board, same(board), reason: 'the move bought more time');
 
-        for (var i = 0; i < GameViewModel.maxLockResets + 2; i++) {
-          i.isEven ? vm.moveRight() : vm.moveLeft();
-          await tester.pump(const Duration(milliseconds: 400));
-        }
-        expect(
-          vm.state.board,
-          isNot(same(board)),
-          reason: 'stalling is capped',
-        );
-      },
-    );
+      for (var i = 0; i < GameViewModel.maxLockResets + 2; i++) {
+        i.isEven ? vm.moveRight() : vm.moveLeft();
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+      expect(vm.state.board, isNot(same(board)), reason: 'stalling is capped');
+    });
 
     testWidgets('game over records a new best score', (tester) async {
       SharedPreferences.setMockInitialValues({'high_score': 10});
-      final vm = seededViewModel();
+      final vm = scoringViewModel();
       addTearDown(vm.dispose);
       await tester.pump();
       expect(vm.highScore, 10);
@@ -100,10 +97,7 @@ void main() {
       await tester.pump();
       expect(vm.isNewHighScore, isTrue);
       expect(vm.highScore, vm.state.score);
-      expect(
-        (await SharedPreferences.getInstance()).getInt('high_score'),
-        vm.state.score,
-      );
+      expect((await SharedPreferences.getInstance()).getInt('high_score'), vm.state.score);
     });
 
     testWidgets('a lower score keeps the saved best', (tester) async {
@@ -138,13 +132,18 @@ void main() {
       expect(vm.state.active.row, row + 1);
     });
 
-    testWidgets('hard drop scores and deals the next piece', (tester) async {
-      final vm = seededViewModel();
+    testWidgets('score comes only from cleared lines', (tester) async {
+      final vm = scoringViewModel();
       addTearDown(vm.dispose);
+      vm.moveLeft();
+      vm.moveRight();
+      vm.softDrop();
+      expect(vm.state.score, 0, reason: 'moves and drops earn nothing');
       final next = vm.state.next;
       vm.hardDrop();
       expect(vm.state.active.type, next);
-      expect(vm.state.score, greaterThan(0));
+      expect(vm.state.lines, 1);
+      expect(vm.state.score, 100);
       vm.restart();
       expect(vm.state.score, 0);
     });
@@ -157,14 +156,10 @@ void main() {
       expect(find.text('Level 1 · 0 lines'), findsOneWidget);
     });
 
-    testWidgets('tap rotates, horizontal drag moves one column per cell', (
-      tester,
-    ) async {
+    testWidgets('tap rotates, horizontal drag moves one column per cell', (tester) async {
       final vm = seededViewModel();
       await pumpScreen(tester, vm);
-      final board = find.byWidgetPredicate(
-        (w) => w is CustomPaint && w.painter is BoardPainter,
-      );
+      final board = find.byWidgetPredicate((w) => w is CustomPaint && w.painter is BoardPainter);
 
       final rotation = vm.state.active.rotation;
       await tester.tap(board);
@@ -194,9 +189,7 @@ void main() {
       expect(vm.state.status, GameStatus.playing);
     });
 
-    testWidgets('restart from the pause sheet starts a new game', (
-      tester,
-    ) async {
+    testWidgets('restart from the pause sheet starts a new game', (tester) async {
       final vm = seededViewModel();
       await pumpScreen(tester, vm);
       vm.hardDrop();
@@ -208,10 +201,8 @@ void main() {
       expect(vm.state.score, 0);
     });
 
-    testWidgets('game over shows the result and Play again restarts', (
-      tester,
-    ) async {
-      final vm = seededViewModel();
+    testWidgets('game over shows the result and Play again restarts', (tester) async {
+      final vm = scoringViewModel();
       await pumpScreen(tester, vm);
       while (vm.state.status != GameStatus.over) {
         vm.hardDrop();
@@ -231,16 +222,12 @@ void main() {
     BoardPainter painter(WidgetTester tester) =>
         tester
                 .widget<CustomPaint>(
-                  find.byWidgetPredicate(
-                    (w) => w is CustomPaint && w.painter is BoardPainter,
-                  ),
+                  find.byWidgetPredicate((w) => w is CustomPaint && w.painter is BoardPainter),
                 )
                 .painter!
             as BoardPainter;
 
-    testWidgets('gear opens settings; the ghost switch hides the ghost', (
-      tester,
-    ) async {
+    testWidgets('gear opens settings; the ghost switch hides the ghost', (tester) async {
       final vm = seededViewModel();
       final settings = SettingsViewModel();
       await pumpScreen(tester, vm, settings: settings);
@@ -249,11 +236,7 @@ void main() {
       await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
       expect(vm.state.status, GameStatus.paused);
-      expect(
-        find.text('Paused'),
-        findsNothing,
-        reason: 'no pause sheet over settings',
-      );
+      expect(find.text('Paused'), findsNothing, reason: 'no pause sheet over settings');
 
       await tester.tap(find.text('Ghost piece'));
       await tester.pumpAndSettle();
@@ -261,12 +244,38 @@ void main() {
 
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(
-        find.text('Paused'),
-        findsOneWidget,
-        reason: 'returning offers Resume',
-      );
+      expect(find.text('Paused'), findsOneWidget, reason: 'returning offers Resume');
       expect(painter(tester).showGhost, isFalse);
+    });
+
+    testWidgets('button controls replace gestures and repeat while held', (tester) async {
+      final vm = seededViewModel();
+      await pumpScreen(tester, vm, settings: SettingsViewModel(controls: ControlScheme.buttons));
+      final board = find.byWidgetPredicate((w) => w is CustomPaint && w.painter is BoardPainter);
+
+      final rotation = vm.state.active.rotation;
+      await tester.tap(board);
+      expect(vm.state.active.rotation, rotation, reason: 'board gestures are off');
+
+      await tester.tap(find.bySemanticsLabel('Rotate'));
+      expect(vm.state.active.rotation, (rotation + 1) % 4);
+
+      final col = vm.state.active.col;
+      await tester.tap(find.bySemanticsLabel('Move left'));
+      expect(vm.state.active.col, col - 1, reason: 'acts on touch-down, once per tap');
+
+      final hold = await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Move right')));
+      await tester.pump(const Duration(milliseconds: 300));
+      await hold.up();
+      expect(vm.state.active.col, greaterThan(col), reason: 'holding repeats');
+      final settled = vm.state.active.col;
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(vm.state.active.col, settled, reason: 'releasing stops the repeat');
+    });
+
+    testWidgets('gesture mode shows no button pad', (tester) async {
+      await pumpScreen(tester, seededViewModel());
+      expect(find.bySemanticsLabel('Rotate'), findsNothing);
     });
 
     test('choices are saved and restored', () async {
@@ -274,11 +283,13 @@ void main() {
       saved
         ..themeMode = ThemeMode.dark
         ..showGhost = false
-        ..haptics = false;
+        ..haptics = false
+        ..controls = ControlScheme.buttons;
       final restored = await SettingsViewModel.load();
       expect(restored.themeMode, ThemeMode.dark);
       expect(restored.showGhost, isFalse);
       expect(restored.haptics, isFalse);
+      expect(restored.controls, ControlScheme.buttons);
     });
   });
 }

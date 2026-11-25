@@ -11,9 +11,9 @@ import '../model/game.dart';
 /// notifies the view of every new state.
 class GameViewModel extends ChangeNotifier {
   GameViewModel({Game? game, HighScoreStore? highScores, bool Function()? hapticsEnabled})
-      : _game = game ?? Game(),
-        _highScores = highScores ?? HighScoreStore(),
-        _hapticsEnabled = hapticsEnabled ?? (() => true) {
+    : _game = game ?? Game(),
+      _highScores = highScores ?? HighScoreStore(),
+      _hapticsEnabled = hapticsEnabled ?? (() => true) {
     _state = _game.start();
     _scheduleGravity();
     _highScoreLoaded = _loadHighScore();
@@ -81,11 +81,7 @@ class GameViewModel extends ChangeNotifier {
   }
 
   /// Applies [action]; returns false when the rules rejected it.
-  bool _apply(
-    GameState Function(GameState) action, {
-    bool restartGravity = false,
-    bool playerMoved = false,
-  }) {
+  bool _apply(GameState Function(GameState) action, {bool restartGravity = false, bool playerMoved = false}) {
     final previous = _state;
     final next = action(previous);
     if (identical(next, previous)) return false;

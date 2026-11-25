@@ -1,6 +1,16 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// How the player steers pieces on a touch screen. The keyboard works in
+/// both modes.
+enum ControlScheme {
+  /// Tap to rotate, swipe to move, flick down to drop.
+  gestures,
+
+  /// An on-screen button pad below the board.
+  buttons,
+}
+
 /// Player preferences, persisted on the device. Every change is saved
 /// immediately and broadcast to listeners (the app theme, the board, the
 /// game's haptics).
@@ -10,6 +20,7 @@ class SettingsViewModel extends ChangeNotifier {
     this._themeMode = ThemeMode.system,
     this._showGhost = true,
     this._haptics = true,
+    this._controls = ControlScheme.gestures,
     this._prefs,
   });
 
@@ -22,6 +33,10 @@ class SettingsViewModel extends ChangeNotifier {
       themeMode: ThemeMode.values.firstWhere((m) => m.name == mode, orElse: () => ThemeMode.system),
       showGhost: prefs.getBool(_ghostKey) ?? true,
       haptics: prefs.getBool(_hapticsKey) ?? true,
+      controls: ControlScheme.values.firstWhere(
+        (c) => c.name == prefs.getString(_controlsKey),
+        orElse: () => ControlScheme.gestures,
+      ),
       prefs: prefs,
     );
   }
@@ -29,15 +44,18 @@ class SettingsViewModel extends ChangeNotifier {
   static const _themeKey = 'theme_mode';
   static const _ghostKey = 'show_ghost';
   static const _hapticsKey = 'haptics';
+  static const _controlsKey = 'controls';
 
   final SharedPreferences? _prefs;
   ThemeMode _themeMode;
   bool _showGhost;
   bool _haptics;
+  ControlScheme _controls;
 
   ThemeMode get themeMode => _themeMode;
   bool get showGhost => _showGhost;
   bool get haptics => _haptics;
+  ControlScheme get controls => _controls;
 
   set themeMode(ThemeMode value) {
     if (value == _themeMode) return;
@@ -57,6 +75,13 @@ class SettingsViewModel extends ChangeNotifier {
     if (value == _haptics) return;
     _haptics = value;
     _prefs?.setBool(_hapticsKey, value);
+    notifyListeners();
+  }
+
+  set controls(ControlScheme value) {
+    if (value == _controls) return;
+    _controls = value;
+    _prefs?.setString(_controlsKey, value.name);
     notifyListeners();
   }
 }

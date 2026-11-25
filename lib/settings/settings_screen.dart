@@ -29,6 +29,20 @@ class SettingsScreen extends StatelessWidget {
     ThemeMode.dark: Icons.dark_mode_rounded,
   };
 
+  static const _controlLabels = {ControlScheme.gestures: 'Gestures', ControlScheme.buttons: 'Buttons'};
+  static const _controlIconsApple = {
+    ControlScheme.gestures: CupertinoIcons.hand_draw_fill,
+    ControlScheme.buttons: CupertinoIcons.game_controller_solid,
+  };
+  static const _controlIconsMaterial = {
+    ControlScheme.gestures: Icons.swipe_rounded,
+    ControlScheme.buttons: Icons.gamepad_rounded,
+  };
+  static const _controlHints = {
+    ControlScheme.gestures: 'Tap the board to rotate, swipe to move, flick down to drop.',
+    ControlScheme.buttons: 'Buttons below the board move, drop and rotate. Hold an arrow to repeat.',
+  };
+
   static const _ghostHint = 'Outline where the falling piece will land';
   static const _hapticsHint = 'Vibrate on drops, line clears and game over';
 
@@ -40,8 +54,7 @@ class SettingsScreen extends StatelessWidget {
     };
     return ListenableBuilder(
       listenable: settings,
-      builder: (context, _) =>
-          isApple ? _buildCupertino(context) : _buildMaterial(context),
+      builder: (context, _) => isApple ? _buildCupertino(context) : _buildMaterial(context),
     );
   }
 
@@ -59,35 +72,26 @@ class SettingsScreen extends StatelessWidget {
               CupertinoListSection.insetGrouped(
                 header: const Text('Appearance'),
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: CupertinoSlidingSegmentedControl<ThemeMode>(
-                        groupValue: settings.themeMode,
-                        onValueChanged: (mode) {
-                          if (mode != null) settings.themeMode = mode;
-                        },
-                        children: {
-                          for (final e in _themeLabels.entries)
-                            e.key: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              // Shrinks rather than clipping at large text sizes.
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(_themeIconsApple[e.key], size: 17),
-                                    const SizedBox(width: 6),
-                                    Text(e.value),
-                                  ],
-                                ),
-                              ),
-                            ),
-                        },
-                      ),
-                    ),
+                  _cupertinoSegments(
+                    value: settings.themeMode,
+                    labels: _themeLabels,
+                    icons: _themeIconsApple,
+                    onChanged: (mode) => settings.themeMode = mode,
+                  ),
+                ],
+              ),
+              CupertinoListSection.insetGrouped(
+                header: const Text('Controls'),
+                footer: Text(
+                  _controlHints[settings.controls]!,
+                  style: TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel.resolveFrom(context)),
+                ),
+                children: [
+                  _cupertinoSegments(
+                    value: settings.controls,
+                    labels: _controlLabels,
+                    icons: _controlIconsApple,
+                    onChanged: (c) => settings.controls = c,
                   ),
                 ],
               ),
@@ -119,16 +123,47 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  /// A full-width sliding segmented control whose segments pair an icon
+  /// with a label.
+  Widget _cupertinoSegments<T extends Object>({
+    required T value,
+    required Map<T, String> labels,
+    required Map<T, IconData> icons,
+    required ValueChanged<T> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: SizedBox(
+        width: double.infinity,
+        child: CupertinoSlidingSegmentedControl<T>(
+          groupValue: value,
+          onValueChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+          children: {
+            for (final e in labels.entries)
+              e.key: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                // Shrinks rather than clipping at large text sizes.
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [Icon(icons[e.key], size: 17), const SizedBox(width: 6), Text(e.value)],
+                  ),
+                ),
+              ),
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildMaterial(BuildContext context) {
     final theme = Theme.of(context);
     Widget header(String text) => Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: Text(
-        text,
-        style: theme.textTheme.titleSmall?.copyWith(
-          color: theme.colorScheme.primary,
-        ),
-      ),
+      child: Text(text, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary)),
     );
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -150,6 +185,26 @@ class SettingsScreen extends StatelessWidget {
                     label: Text(e.key == ThemeMode.system ? 'System' : e.value),
                   ),
               ],
+            ),
+          ),
+          header('Controls'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SegmentedButton<ControlScheme>(
+              showSelectedIcon: false,
+              selected: {settings.controls},
+              onSelectionChanged: (s) => settings.controls = s.single,
+              segments: [
+                for (final e in _controlLabels.entries)
+                  ButtonSegment(value: e.key, icon: Icon(_controlIconsMaterial[e.key]), label: Text(e.value)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Text(
+              _controlHints[settings.controls]!,
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
           header('Gameplay'),

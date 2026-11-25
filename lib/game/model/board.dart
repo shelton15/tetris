@@ -2,8 +2,7 @@ import 'piece.dart';
 
 /// The well of settled blocks. Immutable: every change returns a new board.
 class Board {
-  Board.empty({this.width = 10, this.height = 20})
-      : _cells = List.filled(width * height, null);
+  Board.empty({this.width = 10, this.height = 20}) : _cells = List.filled(width * height, null);
 
   Board._(this.width, this.height, this._cells);
 
@@ -23,12 +22,11 @@ class Board {
 
   PieceType? at(int row, int col) => _cells[row * width + col];
 
-  bool isInside(int row, int col) =>
-      row >= 0 && row < height && col >= 0 && col < width;
+  bool isInside(int row, int col) => row >= 0 && row < height && col >= 0 && col < width;
 
   /// True when every cell of [piece] is inside the well and unoccupied.
-  bool fits(ActivePiece piece) => piece.cells
-      .every((c) => isInside(c.row, c.col) && at(c.row, c.col) == null);
+  bool fits(ActivePiece piece) =>
+      piece.cells.every((c) => isInside(c.row, c.col) && at(c.row, c.col) == null);
 
   /// Settles [piece] into the board.
   Board lock(ActivePiece piece) {
@@ -49,10 +47,7 @@ class Board {
       row.contains(null) ? kept.add(row) : rows.add(r);
     }
     if (rows.isEmpty) return (board: this, rows: const []);
-    final cells = [
-      ...List<PieceType?>.filled(rows.length * width, null),
-      for (final row in kept) ...row,
-    ];
+    final cells = [...List<PieceType?>.filled(rows.length * width, null), for (final row in kept) ...row];
     return (board: Board._(width, height, cells), rows: rows);
   }
 }

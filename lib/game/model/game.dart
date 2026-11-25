@@ -34,8 +34,7 @@ class GameState {
   int get level => lines ~/ 10 + 1;
 
   /// Time between automatic one-row drops: 15% faster per level, floored.
-  Duration get dropInterval =>
-      Duration(milliseconds: max(80, (800 * pow(0.85, level - 1)).round()));
+  Duration get dropInterval => Duration(milliseconds: max(80, (800 * pow(0.85, level - 1)).round()));
 
   /// True when the active piece is resting on the floor or a block.
   bool get isGrounded => !board.fits(active.moved(dRow: 1));
@@ -56,15 +55,14 @@ class GameState {
     int? score,
     int? lines,
     GameStatus? status,
-  }) =>
-      GameState(
-        board: board ?? this.board,
-        active: active ?? this.active,
-        next: next ?? this.next,
-        score: score ?? this.score,
-        lines: lines ?? this.lines,
-        status: status ?? this.status,
-      );
+  }) => GameState(
+    board: board ?? this.board,
+    active: active ?? this.active,
+    next: next ?? this.next,
+    score: score ?? this.score,
+    lines: lines ?? this.lines,
+    status: status ?? this.status,
+  );
 }
 
 /// The rules. Each action takes a state and returns the next one; actions
@@ -82,11 +80,7 @@ class Game {
 
   GameState start({int width = 10, int height = 20}) {
     final board = Board.empty(width: width, height: height);
-    return GameState(
-      board: board,
-      active: ActivePiece.spawn(_bag.next(), width),
-      next: _bag.next(),
-    );
+    return GameState(board: board, active: ActivePiece.spawn(_bag.next(), width), next: _bag.next());
   }
 
   GameState moveLeft(GameState s) => _shift(s, -1);
@@ -109,26 +103,25 @@ class Game {
     return s.copyWith(active: s.active.moved(dRow: 1));
   }
 
-  /// Player-driven drop of one row; scores 1 point per row. Does nothing
-  /// once grounded, so holding it never locks a piece early.
+  /// Player-driven drop of one row. Does nothing once grounded, so holding
+  /// it never locks a piece early. Earns no points: only cleared rows score.
   GameState softDrop(GameState s) {
     if (s.status != GameStatus.playing || s.isGrounded) return s;
-    return s.copyWith(active: s.active.moved(dRow: 1), score: s.score + 1);
+    return s.copyWith(active: s.active.moved(dRow: 1));
   }
 
-  /// Drops straight to the ghost position and locks; 2 points per row.
+  /// Drops straight to the ghost position and locks. Earns no points by
+  /// itself: only cleared rows score.
   GameState hardDrop(GameState s) {
     if (s.status != GameStatus.playing) return s;
-    final landed = s.ghost;
-    final dropped = landed.row - s.active.row;
-    return lock(s.copyWith(active: landed, score: s.score + 2 * dropped));
+    return lock(s.copyWith(active: s.ghost));
   }
 
   GameState togglePause(GameState s) => switch (s.status) {
-        GameStatus.playing => s.copyWith(status: GameStatus.paused),
-        GameStatus.paused => s.copyWith(status: GameStatus.playing),
-        GameStatus.over => s,
-      };
+    GameStatus.playing => s.copyWith(status: GameStatus.paused),
+    GameStatus.paused => s.copyWith(status: GameStatus.playing),
+    GameStatus.over => s,
+  };
 
   GameState _shift(GameState s, int dCol) {
     if (s.status != GameStatus.playing) return s;

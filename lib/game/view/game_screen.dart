@@ -9,6 +9,7 @@ import '../view_model/settings_view_model.dart';
 import '../model/game.dart';
 import '../view_model/game_view_model.dart';
 import 'board_painter.dart';
+import 'control_pad.dart';
 import 'touch_controls.dart';
 
 /// The play screen: score bar, board, touch and keyboard input, the pause
@@ -25,11 +26,9 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen>
-    with SingleTickerProviderStateMixin {
+class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateMixin {
   late final GameViewModel _vm =
-      widget.viewModel ??
-      GameViewModel(hapticsEnabled: () => widget.settings.haptics);
+      widget.viewModel ?? GameViewModel(hapticsEnabled: () => widget.settings.haptics);
   late final AnimationController _flash = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 280),
@@ -86,8 +85,7 @@ class _GameScreenState extends State<GameScreen>
       LogicalKeyboardKey.keyX when first => _vm.rotate,
       LogicalKeyboardKey.space when first => over ? _vm.restart : _vm.hardDrop,
       LogicalKeyboardKey.enter when first && over => _vm.restart,
-      LogicalKeyboardKey.keyP ||
-      LogicalKeyboardKey.escape when first => _vm.pause,
+      LogicalKeyboardKey.keyP || LogicalKeyboardKey.escape when first => _vm.pause,
       _ => null,
     };
     if (action == null) return KeyEventResult.ignored;
@@ -97,9 +95,7 @@ class _GameScreenState extends State<GameScreen>
 
   Future<void> _showPauseSheet() async {
     _sheetOpen = true;
-    final restart = await (_isApple
-        ? _showCupertinoPauseSheet()
-        : _showMaterialPauseSheet());
+    final restart = await (_isApple ? _showCupertinoPauseSheet() : _showMaterialPauseSheet());
     _sheetOpen = false;
     if (!mounted) return;
     restart == true ? _vm.restart() : _vm.resume();
@@ -112,11 +108,8 @@ class _GameScreenState extends State<GameScreen>
     final wasPlaying = _vm.state.status == GameStatus.playing;
     _sheetOpen = true;
     _vm.pause();
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => SettingsScreen(settings: widget.settings),
-      ),
-    );
+    await Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(settings: widget.settings)));
     _sheetOpen = false;
     if (!mounted) return;
     if (wasPlaying && _vm.state.status == GameStatus.paused) {
@@ -132,9 +125,7 @@ class _GameScreenState extends State<GameScreen>
       context: context,
       builder: (ctx) => CupertinoActionSheet(
         title: const Text('Paused'),
-        message: Text(
-          '${formatScore(s.score)} points · Best ${formatScore(_vm.highScore)}',
-        ),
+        message: Text('${formatScore(s.score)} points · Best ${formatScore(_vm.highScore)}'),
         actions: [
           CupertinoActionSheetAction(
             isDestructiveAction: true,
@@ -169,21 +160,14 @@ class _GameScreenState extends State<GameScreen>
                 const SizedBox(height: 4),
                 Text(
                   '${formatScore(s.score)} points · Best ${formatScore(_vm.highScore)}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Resume'),
-                ),
+                FilledButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Resume')),
                 // Restart sits apart from Resume so it is never hit by accident.
                 const SizedBox(height: 32),
                 TextButton(
-                  style: TextButton.styleFrom(
-                    foregroundColor: theme.colorScheme.error,
-                  ),
+                  style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
                   onPressed: () => Navigator.pop(ctx, true),
                   child: const Text('Restart game'),
                 ),
@@ -208,6 +192,7 @@ class _GameScreenState extends State<GameScreen>
             listenable: Listenable.merge([_vm, widget.settings]),
             builder: (context, _) {
               final state = _vm.state;
+              final buttons = widget.settings.controls == ControlScheme.buttons;
               return Column(
                 children: [
                   Padding(
@@ -229,6 +214,7 @@ class _GameScreenState extends State<GameScreen>
                             )
                             .floorToDouble();
                         return TouchControls(
+                          enabled: !buttons,
                           viewModel: _vm,
                           cellSize: cell,
                           child: Center(
@@ -240,7 +226,9 @@ class _GameScreenState extends State<GameScreen>
                                 children: [
                                   Semantics(
                                     label: 'Board',
-                                    hint: 'Tap to rotate. Swipe sideways to move. Swipe down to drop.',
+                                    hint: buttons
+                                        ? null
+                                        : 'Tap to rotate. Swipe sideways to move. Swipe down to drop.',
                                     child: CustomPaint(
                                       painter: BoardPainter(
                                         state: state,
@@ -252,8 +240,7 @@ class _GameScreenState extends State<GameScreen>
                                     ),
                                   ),
                                   AnimatedSwitcher(
-                                    duration:
-                                        MediaQuery.disableAnimationsOf(context)
+                                    duration: MediaQuery.disableAnimationsOf(context)
                                         ? Duration.zero
                                         : const Duration(milliseconds: 220),
                                     child: state.status == GameStatus.over
@@ -274,6 +261,7 @@ class _GameScreenState extends State<GameScreen>
                       },
                     ),
                   ),
+                  if (buttons) ControlPad(viewModel: _vm, isApple: _isApple),
                 ],
               );
             },
@@ -285,15 +273,12 @@ class _GameScreenState extends State<GameScreen>
 }
 
 /// 12480 → "12,480".
-String formatScore(int value) => value.toString().replaceAllMapped(
-  RegExp(r'\B(?=(\d{3})+(?!\d))'),
-  (_) => ',',
-);
+String formatScore(int value) =>
+    value.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
 
 const _tabular = [FontFeature.tabularFigures()];
 
-String _progressLine(GameState s) =>
-    'Level ${s.level} · ${s.lines} ${s.lines == 1 ? 'line' : 'lines'}';
+String _progressLine(GameState s) => 'Level ${s.level} · ${s.lines} ${s.lines == 1 ? 'line' : 'lines'}';
 
 class _ScoreBar extends StatelessWidget {
   const _ScoreBar({
@@ -341,20 +326,14 @@ class _ScoreBar extends StatelessWidget {
         ),
         Semantics(
           label: 'Next piece',
-          child: SizedBox(
-            width: 56,
-            height: 28,
-            child: CustomPaint(painter: NextPiecePainter(state.next)),
-          ),
+          child: SizedBox(width: 56, height: 28, child: CustomPaint(painter: NextPiecePainter(state.next))),
         ),
         const SizedBox(width: 4),
         IconButton(
           tooltip: 'Settings',
           iconSize: 26,
           onPressed: onSettings,
-          icon: Icon(
-            isApple ? CupertinoIcons.gear_alt_fill : Icons.settings_rounded,
-          ),
+          icon: Icon(isApple ? CupertinoIcons.gear_alt_fill : Icons.settings_rounded),
         ),
         IconButton(
           tooltip: 'Pause',
@@ -386,10 +365,7 @@ class _GameOver extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final button = isApple
-        ? CupertinoButton.filled(
-            onPressed: onRestart,
-            child: const Text('Play Again'),
-          )
+        ? CupertinoButton.filled(onPressed: onRestart, child: const Text('Play Again'))
         : FilledButton(onPressed: onRestart, child: const Text('Play again'));
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -400,12 +376,7 @@ class _GameOver extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Game over',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            Text('Game over', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Text(
               formatScore(state.score),
@@ -417,19 +388,13 @@ class _GameOver extends StatelessWidget {
             ),
             Text(
               _progressLine(state),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
             Text(
-              isNewHighScore
-                  ? 'New best score'
-                  : 'Best ${formatScore(highScore)}',
+              isNewHighScore ? 'New best score' : 'Best ${formatScore(highScore)}',
               style: theme.textTheme.titleSmall?.copyWith(
-                color: isNewHighScore
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
+                color: isNewHighScore ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
                 fontFeatures: _tabular,
               ),

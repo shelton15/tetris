@@ -7,10 +7,8 @@ import 'package:tetris/game/model/piece.dart';
 import 'package:tetris/game/model/piece_bag.dart';
 
 /// A 10×20 board whose bottom rows are [bottom]; everything above is empty.
-Board boardWith(List<String> bottom) => Board.fromRows([
-      for (var i = 0; i < 20 - bottom.length; i++) '..........',
-      ...bottom,
-    ]);
+Board boardWith(List<String> bottom) =>
+    Board.fromRows([for (var i = 0; i < 20 - bottom.length; i++) '..........', ...bottom]);
 
 GameState stateWith(Board board, ActivePiece active, {PieceType next = PieceType.t}) =>
     GameState(board: board, active: active, next: next);
@@ -38,9 +36,7 @@ void main() {
 
     test('non-O shapes have distinct rotation states', () {
       expect(PieceType.t.cells(1).toSet(), isNot(PieceType.t.cells(0).toSet()));
-      expect(PieceType.i.cells(1), [
-        (row: 0, col: 2), (row: 1, col: 2), (row: 2, col: 2), (row: 3, col: 2),
-      ]);
+      expect(PieceType.i.cells(1), [(row: 0, col: 2), (row: 1, col: 2), (row: 2, col: 2), (row: 3, col: 2)]);
     });
 
     test('spawn is centred', () {
@@ -63,12 +59,7 @@ void main() {
     });
 
     test('clears full rows and shifts the rest down', () {
-      final board = boardWith([
-        '#.........',
-        '##########',
-        '.#.#.#.#.#',
-        '##########',
-      ]);
+      final board = boardWith(['#.........', '##########', '.#.#.#.#.#', '##########']);
       final result = board.clearFullRows();
       expect(result.rows, [17, 19]);
       expect(result.board.at(19, 1), isNotNull);
@@ -112,10 +103,7 @@ void main() {
 
     test('rotation kicks off the wall', () {
       // Vertical I hugging the right wall: rotating flat needs a nudge left.
-      final s = stateWith(
-        Board.empty(),
-        const ActivePiece(PieceType.i, row: 5, col: 7, rotation: 1),
-      );
+      final s = stateWith(Board.empty(), const ActivePiece(PieceType.i, row: 5, col: 7, rotation: 1));
       final r = game.rotate(s);
       expect(r.active.rotation, 2);
       expect(r.active.col, 6);
@@ -124,24 +112,18 @@ void main() {
 
     test('rotation is refused when no kick fits', () {
       // Vertical I in a 1-wide shaft: no flat position fits anywhere.
-      final shaft = Board.fromRows([
-        for (var i = 0; i < 20; i++) '####.#####',
-      ]);
+      final shaft = Board.fromRows([for (var i = 0; i < 20; i++) '####.#####']);
       final s = stateWith(shaft, const ActivePiece(PieceType.i, row: 4, col: 2, rotation: 1));
       expect(game.rotate(s), same(s));
     });
 
     test('hard drop locks, clears a line and scores', () {
-      final s = stateWith(
-        boardWith(['###....###']),
-        ActivePiece.spawn(PieceType.i, 10),
-        next: PieceType.o,
-      );
+      final s = stateWith(boardWith(['###....###']), ActivePiece.spawn(PieceType.i, 10), next: PieceType.o);
       final after = game.hardDrop(s);
       expect(after.lines, 1);
       expect(after.clearedRows, [19]);
       expect(game.moveLeft(after).clearedRows, isEmpty);
-      expect(after.score, 18 * 2 + 100);
+      expect(after.score, 100, reason: 'only the cleared row scores');
       expect(after.active.type, PieceType.o);
       expect(after.board.at(19, 0), isNull, reason: 'the full row was removed');
     });
@@ -159,13 +141,8 @@ void main() {
     });
 
     test('game ends when the next piece cannot spawn', () {
-      final board = Board.fromRows([
-        '..........',
-        '....##....',
-        for (var i = 0; i < 18; i++) '..........',
-      ]);
-      final s = stateWith(board, const ActivePiece(PieceType.o, row: 18, col: 0),
-          next: PieceType.o);
+      final board = Board.fromRows(['..........', '....##....', for (var i = 0; i < 18; i++) '..........']);
+      final s = stateWith(board, const ActivePiece(PieceType.o, row: 18, col: 0), next: PieceType.o);
       final over = game.lock(game.tick(s));
       expect(over.status, GameStatus.over);
       expect(game.moveLeft(over), same(over));
@@ -186,13 +163,17 @@ void main() {
       expect(s.copyWith(lines: 500).dropInterval, const Duration(milliseconds: 80));
     });
 
+    test('moving and dropping without clearing scores nothing', () {
+      var s = stateWith(Board.empty(), ActivePiece.spawn(PieceType.t, 10));
+      s = game.softDrop(game.softDrop(game.moveLeft(s)));
+      s = game.hardDrop(s);
+      expect(s.score, 0);
+    });
+
     test('score multiplies by level', () {
-      final s = stateWith(
-        boardWith(['###....###']),
-        ActivePiece.spawn(PieceType.i, 10),
-      ).copyWith(lines: 20);
+      final s = stateWith(boardWith(['###....###']), ActivePiece.spawn(PieceType.i, 10)).copyWith(lines: 20);
       final after = game.hardDrop(s);
-      expect(after.score, 18 * 2 + 100 * 3);
+      expect(after.score, 100 * 3);
     });
   });
 }

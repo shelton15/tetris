@@ -33,9 +33,7 @@ enum PieceType {
     final states = <List<Cell>>[List.unmodifiable(type._spawnCells)];
     for (var r = 1; r < 4; r++) {
       final n = type.boxSize;
-      states.add(List.unmodifiable([
-        for (final c in states.last) (row: c.col, col: n - 1 - c.row),
-      ]));
+      states.add(List.unmodifiable([for (final c in states.last) (row: c.col, col: n - 1 - c.row)]));
     }
     return List.unmodifiable(states);
   }
@@ -55,12 +53,10 @@ class ActivePiece {
   final int rotation;
 
   /// Absolute board cells this piece covers.
-  Iterable<Cell> get cells =>
-      type.cells(rotation).map((c) => (row: row + c.row, col: col + c.col));
+  Iterable<Cell> get cells => type.cells(rotation).map((c) => (row: row + c.row, col: col + c.col));
 
   ActivePiece moved({int dRow = 0, int dCol = 0}) =>
       ActivePiece(type, row: row + dRow, col: col + dCol, rotation: rotation);
 
-  ActivePiece rotated() =>
-      ActivePiece(type, row: row, col: col, rotation: (rotation + 1) % 4);
+  ActivePiece rotated() => ActivePiece(type, row: row, col: col, rotation: (rotation + 1) % 4);
 }
