@@ -1,0 +1,18 @@
+# App icon for every platform, generated from assets/branding (see
+# tool/make_branding.py). Regenerate with: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: assets/branding/icon.png
+  android: true
+  adaptive_icon_background: "#F7F7FA"
+  adaptive_icon_foreground: assets/branding/icon_foreground.png
+  ios: true
+  remove_alpha_ios: true
+  web:
+    generate: true
+    background_color: "#F7F7FA"
+    theme_color: "#F7F7FA"
+  macos:
+    generate: true
+  windows:
+    generate: true
+    icon_size: 256

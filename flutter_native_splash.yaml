@@ -1,0 +1,25 @@
+# Launch screen shown while the app starts (and settings load), generated
+# from assets/branding (see tool/make_branding.py).
+# Regenerate with: dart run flutter_native_splash:create
+#
+# Background colours match the app's own light and dark grounds, so the
+# hand-off from splash to the game screen has no flash.
+flutter_native_splash:
+  color: "#F7F7FA"
+  image: assets/branding/splash.png
+  color_dark: "#0E0F12"
+  image_dark: assets/branding/splash_dark.png
+
+  # Android 12+ draws its own splash: an icon in a circle, no wordmark.
+  android_12:
+    image: assets/branding/icon_foreground.png
+    icon_background_color: "#F7F7FA"
+    color: "#F7F7FA"
+    image_dark: assets/branding/icon_foreground.png
+    icon_background_color_dark: "#F7F7FA"
+    color_dark: "#0E0F12"
+
+  android: true
+  ios: true
+  web: true
+  fullscreen: false
