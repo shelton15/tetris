@@ -15,9 +15,15 @@ class GameState {
     this.score = 0,
     this.lines = 0,
     this.status = GameStatus.playing,
+    this.clearedRows = const [],
   });
 
   final Board board;
+
+  /// Rows removed by the lock that produced this state (pre-collapse
+  /// indices). Empty on every other state, so a non-empty list marks the
+  /// exact moment of a clear.
+  final List<int> clearedRows;
   final ActivePiece active;
   final PieceType next;
   final int score;
@@ -131,14 +137,15 @@ class Game {
   /// Settles the active piece, clears rows, scores, and spawns the next
   /// piece. The game ends when the new piece has no room to appear.
   GameState _lock(GameState s) {
-    final (:board, :cleared) = s.board.lock(s.active).clearFullRows();
+    final (:board, :rows) = s.board.lock(s.active).clearFullRows();
     final spawned = ActivePiece.spawn(s.next, board.width);
     return GameState(
       board: board,
       active: spawned,
       next: _bag.next(),
-      score: s.score + lineScores[cleared] * s.level,
-      lines: s.lines + cleared,
+      score: s.score + lineScores[rows.length] * s.level,
+      lines: s.lines + rows.length,
+      clearedRows: rows,
       status: board.fits(spawned) ? GameStatus.playing : GameStatus.over,
     );
   }
