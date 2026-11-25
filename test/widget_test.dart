@@ -8,12 +8,13 @@ import 'package:tetris/game/model/game.dart';
 import 'package:tetris/game/view/board_painter.dart';
 import 'package:tetris/game/view/game_screen.dart';
 import 'package:tetris/game/view_model/game_view_model.dart';
+import 'package:tetris/settings/settings_view_model.dart';
 
 GameViewModel seededViewModel() => GameViewModel(game: Game(random: Random(7)));
 
 /// Pumps the screen with [vm]; tears both down at the end of the test so no
 /// gravity timer is left pending.
-Future<void> pumpScreen(WidgetTester tester, GameViewModel vm) async {
+Future<void> pumpScreen(WidgetTester tester, GameViewModel vm, {SettingsViewModel? settings}) async {
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox());
     vm.dispose();
@@ -21,7 +22,9 @@ Future<void> pumpScreen(WidgetTester tester, GameViewModel vm) async {
   tester.view.physicalSize = const Size(390, 844) * 3;
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(MaterialApp(home: GameScreen(viewModel: vm)));
+  await tester.pumpWidget(
+    MaterialApp(home: GameScreen(viewModel: vm, settings: settings ?? SettingsViewModel())),
+  );
 }
 
 /// Soft-drops until the active piece rests on the floor.
@@ -188,6 +191,45 @@ void main() {
       await tester.pumpAndSettle();
       expect(vm.state.status, GameStatus.playing);
       expect(find.text('Game over'), findsNothing);
+    });
+  });
+
+  group('Settings', () {
+    BoardPainter painter(WidgetTester tester) => tester
+        .widget<CustomPaint>(find.byWidgetPredicate((w) => w is CustomPaint && w.painter is BoardPainter))
+        .painter! as BoardPainter;
+
+    testWidgets('gear opens settings; the ghost switch hides the ghost', (tester) async {
+      final vm = seededViewModel();
+      final settings = SettingsViewModel();
+      await pumpScreen(tester, vm, settings: settings);
+      expect(painter(tester).showGhost, isTrue);
+
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+      expect(vm.state.status, GameStatus.paused);
+      expect(find.text('Paused'), findsNothing, reason: 'no pause sheet over settings');
+
+      await tester.tap(find.text('Ghost piece'));
+      await tester.pumpAndSettle();
+      expect(settings.showGhost, isFalse);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('Paused'), findsOneWidget, reason: 'returning offers Resume');
+      expect(painter(tester).showGhost, isFalse);
+    });
+
+    test('choices are saved and restored', () async {
+      final saved = await SettingsViewModel.load();
+      saved
+        ..themeMode = ThemeMode.dark
+        ..showGhost = false
+        ..haptics = false;
+      final restored = await SettingsViewModel.load();
+      expect(restored.themeMode, ThemeMode.dark);
+      expect(restored.showGhost, isFalse);
+      expect(restored.haptics, isFalse);
     });
   });
 }

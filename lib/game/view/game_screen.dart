@@ -4,6 +4,8 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../settings/settings_screen.dart';
+import '../../settings/settings_view_model.dart';
 import '../model/game.dart';
 import '../view_model/game_view_model.dart';
 import 'board_painter.dart';
@@ -12,7 +14,9 @@ import 'touch_controls.dart';
 /// The play screen: score bar, board, touch and keyboard input, the pause
 /// sheet, and the game-over state. All game logic lives in [GameViewModel].
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, this.viewModel});
+  const GameScreen({super.key, required this.settings, this.viewModel});
+
+  final SettingsViewModel settings;
 
   /// Injected in tests; otherwise the screen creates and owns its own.
   final GameViewModel? viewModel;
@@ -22,7 +26,8 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateMixin {
-  late final GameViewModel _vm = widget.viewModel ?? GameViewModel();
+  late final GameViewModel _vm =
+      widget.viewModel ?? GameViewModel(hapticsEnabled: () => widget.settings.haptics);
   late final AnimationController _flash =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 280), value: 1);
   late final AppLifecycleListener _lifecycle;
@@ -91,6 +96,24 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     if (!mounted) return;
     restart == true ? _vm.restart() : _vm.resume();
     _focus.requestFocus();
+  }
+
+  /// Pauses quietly while settings is open, then offers the pause sheet on
+  /// return so play resumes only when the player is ready.
+  Future<void> _openSettings() async {
+    final wasPlaying = _vm.state.status == GameStatus.playing;
+    _sheetOpen = true;
+    _vm.pause();
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => SettingsScreen(settings: widget.settings)),
+    );
+    _sheetOpen = false;
+    if (!mounted) return;
+    if (wasPlaying && _vm.state.status == GameStatus.paused) {
+      _showPauseSheet();
+    } else {
+      _focus.requestFocus();
+    }
   }
 
   Future<bool?> _showCupertinoPauseSheet() {
@@ -163,14 +186,19 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
           autofocus: true,
           onKeyEvent: _onKey,
           child: ListenableBuilder(
-            listenable: _vm,
+            listenable: Listenable.merge([_vm, widget.settings]),
             builder: (context, _) {
               final state = _vm.state;
               return Column(
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 8, 12),
-                    child: _ScoreBar(state: state, isApple: _isApple, onPause: _vm.pause),
+                    child: _ScoreBar(
+                      state: state,
+                      isApple: _isApple,
+                      onPause: _vm.pause,
+                      onSettings: _openSettings,
+                    ),
                   ),
                   Expanded(
                     child: LayoutBuilder(builder: (context, box) {
@@ -196,6 +224,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                                       colors: colors,
                                       flash: _flash,
                                       flashRows: _flashRows,
+                                      showGhost: widget.settings.showGhost,
                                     ),
                                   ),
                                 ),
@@ -239,11 +268,17 @@ const _tabular = [FontFeature.tabularFigures()];
 String _progressLine(GameState s) => 'Level ${s.level} · ${s.lines} ${s.lines == 1 ? 'line' : 'lines'}';
 
 class _ScoreBar extends StatelessWidget {
-  const _ScoreBar({required this.state, required this.isApple, required this.onPause});
+  const _ScoreBar({
+    required this.state,
+    required this.isApple,
+    required this.onPause,
+    required this.onSettings,
+  });
 
   final GameState state;
   final bool isApple;
   final VoidCallback onPause;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -280,7 +315,13 @@ class _ScoreBar extends StatelessWidget {
           label: 'Next piece',
           child: SizedBox(width: 56, height: 28, child: CustomPaint(painter: NextPiecePainter(state.next))),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
+        IconButton(
+          tooltip: 'Settings',
+          iconSize: 26,
+          onPressed: onSettings,
+          icon: Icon(isApple ? CupertinoIcons.gear_alt_fill : Icons.settings_rounded),
+        ),
         IconButton(
           tooltip: 'Pause',
           iconSize: 28,

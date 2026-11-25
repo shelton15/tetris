@@ -10,9 +10,10 @@ import '../model/game.dart';
 /// drives gravity and the lock delay on timers, keeps the best score, and
 /// notifies the view of every new state.
 class GameViewModel extends ChangeNotifier {
-  GameViewModel({Game? game, HighScoreStore? highScores})
+  GameViewModel({Game? game, HighScoreStore? highScores, bool Function()? hapticsEnabled})
       : _game = game ?? Game(),
-        _highScores = highScores ?? HighScoreStore() {
+        _highScores = highScores ?? HighScoreStore(),
+        _hapticsEnabled = hapticsEnabled ?? (() => true) {
     _state = _game.start();
     _scheduleGravity();
     _highScoreLoaded = _loadHighScore();
@@ -27,6 +28,7 @@ class GameViewModel extends ChangeNotifier {
 
   final Game _game;
   final HighScoreStore _highScores;
+  final bool Function() _hapticsEnabled;
   late GameState _state;
   Timer? _gravity;
   Timer? _lockTimer;
@@ -56,7 +58,7 @@ class GameViewModel extends ChangeNotifier {
   void softDrop() => _apply(_game.softDrop, restartGravity: true);
 
   void hardDrop() {
-    if (_apply(_game.hardDrop, restartGravity: true)) HapticFeedback.lightImpact();
+    if (_apply(_game.hardDrop, restartGravity: true) && _hapticsEnabled()) HapticFeedback.lightImpact();
   }
 
   void pause() {
@@ -106,6 +108,7 @@ class GameViewModel extends ChangeNotifier {
   /// Feedback only where it carries meaning: a drop landing, rows clearing
   /// (stronger for four), and the game ending.
   void _playHaptic(GameState previous, GameState next) {
+    if (!_hapticsEnabled()) return;
     if (next.status == GameStatus.over && previous.status != GameStatus.over) {
       HapticFeedback.heavyImpact();
     } else if (next.clearedRows.length >= 4) {

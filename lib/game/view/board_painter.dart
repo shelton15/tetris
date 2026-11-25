@@ -81,12 +81,14 @@ class BoardPainter extends CustomPainter {
     required this.colors,
     required this.flash,
     this.flashRows = const [],
+    this.showGhost = true,
   }) : super(repaint: flash);
 
   final GameState state;
   final BoardColors colors;
   final Animation<double> flash;
   final List<int> flashRows;
+  final bool showGhost;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -112,7 +114,7 @@ class BoardPainter extends CustomPainter {
       }
     }
 
-    if (state.status != GameStatus.over) {
+    if (state.status != GameStatus.over && showGhost) {
       final ghostPaint = Paint()
         ..color = BoardColors.pieces[state.active.type]!.withValues(alpha: 0.6)
         ..style = PaintingStyle.stroke
@@ -121,6 +123,8 @@ class BoardPainter extends CustomPainter {
         final r = rectAt(c.row, c.col).deflate(cell * 0.1);
         canvas.drawRRect(RRect.fromRectAndRadius(r, Radius.circular(r.width * 0.2)), ghostPaint);
       }
+    }
+    if (state.status != GameStatus.over) {
       for (final c in state.active.cells) {
         paintBlock(canvas, rectAt(c.row, c.col), state.active.type);
       }
@@ -137,7 +141,9 @@ class BoardPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(BoardPainter old) =>
-      !identical(old.state, state) || old.colors != colors || old.flashRows != flashRows;
+      !identical(old.state, state) || old.colors != colors ||
+      old.flashRows != flashRows ||
+      old.showGhost != showGhost;
 }
 
 /// The small preview of the next shape, centred in a 4×2 box.
