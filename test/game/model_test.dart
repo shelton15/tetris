@@ -70,7 +70,7 @@ void main() {
         '##########',
       ]);
       final result = board.clearFullRows();
-      expect(result.cleared, 2);
+      expect(result.rows, [17, 19]);
       expect(result.board.at(19, 1), isNotNull);
       expect(result.board.at(19, 0), isNull);
       expect(result.board.at(18, 0), isNotNull);
@@ -139,6 +139,8 @@ void main() {
       );
       final after = game.hardDrop(s);
       expect(after.lines, 1);
+      expect(after.clearedRows, [19]);
+      expect(game.moveLeft(after).clearedRows, isEmpty);
       expect(after.score, 18 * 2 + 100);
       expect(after.active.type, PieceType.o);
       expect(after.board.at(19, 0), isNull, reason: 'the full row was removed');
