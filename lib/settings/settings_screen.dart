@@ -2,6 +2,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../game/view_model/settings_view_model.dart';
+import 'gesture_guide.dart';
 
 /// Preferences, laid out with each platform's own settings conventions:
 /// inset grouped lists on Apple platforms, Material lists elsewhere.
@@ -38,10 +39,7 @@ class SettingsScreen extends StatelessWidget {
     ControlScheme.gestures: Icons.swipe_rounded,
     ControlScheme.buttons: Icons.gamepad_rounded,
   };
-  static const _controlHints = {
-    ControlScheme.gestures: 'Tap the board to rotate, swipe to move, flick down to drop.',
-    ControlScheme.buttons: 'Buttons below the board move, drop and rotate. Hold an arrow to repeat.',
-  };
+  static const _buttonsHint = 'Buttons below the board move, drop and rotate. Hold an arrow to repeat.';
 
   static const _ghostHint = 'Outline where the falling piece will land';
   static const _hapticsHint = 'Vibrate on drops, line clears and game over';
@@ -82,10 +80,15 @@ class SettingsScreen extends StatelessWidget {
               ),
               CupertinoListSection.insetGrouped(
                 header: const Text('Controls'),
-                footer: Text(
-                  _controlHints[settings.controls]!,
-                  style: TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel.resolveFrom(context)),
-                ),
+                footer: settings.controls == ControlScheme.buttons
+                    ? Text(
+                        _buttonsHint,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                        ),
+                      )
+                    : null,
                 children: [
                   _cupertinoSegments(
                     value: settings.controls,
@@ -93,6 +96,9 @@ class SettingsScreen extends StatelessWidget {
                     icons: _controlIconsApple,
                     onChanged: (c) => settings.controls = c,
                   ),
+                  // Shows each gesture in motion, so the player learns them here
+                  // rather than by trial on the board.
+                  if (settings.controls == ControlScheme.gestures) const GestureGuide(isApple: true),
                 ],
               ),
               CupertinoListSection.insetGrouped(
@@ -200,13 +206,16 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Text(
-              _controlHints[settings.controls]!,
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          if (settings.controls == ControlScheme.gestures)
+            const Padding(padding: EdgeInsets.only(top: 12), child: GestureGuide(isApple: false))
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                _buttonsHint,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
             ),
-          ),
           header('Gameplay'),
           SwitchListTile(
             title: const Text('Ghost piece'),

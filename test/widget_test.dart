@@ -11,6 +11,8 @@ import 'package:tetris/game/view/board_painter.dart';
 import 'package:tetris/game/view/game_screen.dart';
 import 'package:tetris/game/view_model/game_view_model.dart';
 import 'package:tetris/game/view_model/settings_view_model.dart';
+import 'package:tetris/settings/gesture_guide.dart';
+import 'package:tetris/settings/settings_screen.dart';
 
 GameViewModel seededViewModel() => GameViewModel(game: Game(random: Random(7)));
 
@@ -234,18 +236,58 @@ void main() {
       expect(painter(tester).showGhost, isTrue);
 
       await tester.tap(find.byTooltip('Settings'));
-      await tester.pumpAndSettle();
+      // The gesture guide loops forever, so pump through the page
+      // transition instead of waiting for everything to settle.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
       expect(vm.state.status, GameStatus.paused);
       expect(find.text('Paused'), findsNothing, reason: 'no pause sheet over settings');
 
+      await tester.ensureVisible(find.text('Ghost piece'));
       await tester.tap(find.text('Ghost piece'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
       expect(settings.showGhost, isFalse);
 
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('Paused'), findsOneWidget, reason: 'returning offers Resume');
       expect(painter(tester).showGhost, isFalse);
+    });
+
+    testWidgets('choosing gestures plays a guide that steps through each gesture', (tester) async {
+      final settings = SettingsViewModel();
+      await tester.pumpWidget(MaterialApp(home: SettingsScreen(settings: settings)));
+      await tester.pump();
+      expect(find.byType(GestureGuide), findsOneWidget);
+      expect(find.text('Tap'), findsOneWidget);
+      expect(find.text('Rotates the piece'), findsOneWidget);
+
+      await tester.pump(GestureGuide.stepDuration);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Swipe sideways'), findsOneWidget);
+
+      await tester.pump(GestureGuide.stepDuration * 2);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Flick down'), findsOneWidget);
+
+      settings.controls = ControlScheme.buttons;
+      await tester.pump();
+      expect(find.byType(GestureGuide), findsNothing, reason: 'buttons mode shows its hint instead');
+    });
+
+    testWidgets('with reduced motion the guide is a still list of all gestures', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(disableAnimations: true),
+            child: SettingsScreen(settings: SettingsViewModel()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle(); // settles: nothing loops
+      for (final title in ['Tap', 'Swipe sideways', 'Drag down', 'Flick down']) {
+        expect(find.textContaining(title), findsOneWidget);
+      }
     });
 
     testWidgets('button controls replace gestures and repeat while held', (tester) async {
