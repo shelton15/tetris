@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../settings/settings_screen.dart';
+import '../audio/sound_effects.dart';
 import '../view_model/settings_view_model.dart';
 import '../model/game.dart';
 import '../view_model/game_view_model.dart';
@@ -15,9 +16,12 @@ import 'touch_controls.dart';
 /// The play screen: score bar, board, touch and keyboard input, the pause
 /// sheet, and the game-over state. All game logic lives in [GameViewModel].
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.settings, this.viewModel});
+  const GameScreen({super.key, required this.settings, this.sounds, this.viewModel});
 
   final SettingsViewModel settings;
+
+  /// App-wide sound effects; null plays nothing.
+  final SoundEffects? sounds;
 
   /// Injected in tests; otherwise the screen creates and owns its own.
   final GameViewModel? viewModel;
@@ -28,7 +32,12 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateMixin {
   late final GameViewModel _vm =
-      widget.viewModel ?? GameViewModel(hapticsEnabled: () => widget.settings.haptics);
+      widget.viewModel ??
+      GameViewModel(
+        hapticsEnabled: () => widget.settings.haptics,
+        sounds: widget.sounds,
+        soundEnabled: () => widget.settings.sound,
+      );
   late final AnimationController _flash = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 280),

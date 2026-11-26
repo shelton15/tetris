@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../audio/sound_effects.dart';
 import '../data/high_score_store.dart';
 import '../model/game.dart';
 
@@ -10,10 +11,17 @@ import '../model/game.dart';
 /// drives gravity and the lock delay on timers, keeps the best score, and
 /// notifies the view of every new state.
 class GameViewModel extends ChangeNotifier {
-  GameViewModel({Game? game, HighScoreStore? highScores, bool Function()? hapticsEnabled})
-    : _game = game ?? Game(),
-      _highScores = highScores ?? HighScoreStore(),
-      _hapticsEnabled = hapticsEnabled ?? (() => true) {
+  /// [sounds] is shared and owned by the caller; null plays nothing.
+  GameViewModel({
+    Game? game,
+    HighScoreStore? highScores,
+    bool Function()? hapticsEnabled,
+    this._sounds,
+    bool Function()? soundEnabled,
+  }) : _game = game ?? Game(),
+       _highScores = highScores ?? HighScoreStore(),
+       _hapticsEnabled = hapticsEnabled ?? (() => true),
+       _soundEnabled = soundEnabled ?? (() => true) {
     _state = _game.start();
     _scheduleGravity();
     _highScoreLoaded = _loadHighScore();
@@ -29,6 +37,8 @@ class GameViewModel extends ChangeNotifier {
   final Game _game;
   final HighScoreStore _highScores;
   final bool Function() _hapticsEnabled;
+  final SoundEffects? _sounds;
+  final bool Function() _soundEnabled;
   late GameState _state;
   Timer? _gravity;
   Timer? _lockTimer;
@@ -54,12 +64,9 @@ class GameViewModel extends ChangeNotifier {
 
   void moveLeft() => _apply(_game.moveLeft, playerMoved: true);
   void moveRight() => _apply(_game.moveRight, playerMoved: true);
-  void rotate() => _apply(_game.rotate, playerMoved: true);
+  void rotate() => _apply(_game.rotate, playerMoved: true, command: Sfx.rotate);
   void softDrop() => _apply(_game.softDrop, restartGravity: true);
-
-  void hardDrop() {
-    if (_apply(_game.hardDrop, restartGravity: true) && _hapticsEnabled()) HapticFeedback.lightImpact();
-  }
+  void hardDrop() => _apply(_game.hardDrop, restartGravity: true, command: Sfx.hardDrop);
 
   void pause() {
     if (_state.status == GameStatus.playing) _apply(_game.togglePause);
@@ -80,37 +87,66 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Applies [action]; returns false when the rules rejected it.
-  bool _apply(GameState Function(GameState) action, {bool restartGravity = false, bool playerMoved = false}) {
+  /// Applies [action]; does nothing when the rules rejected it. [command]
+  /// is the sound of the player's own action, played only if it took effect.
+  void _apply(
+    GameState Function(GameState) action, {
+    bool restartGravity = false,
+    bool playerMoved = false,
+    Sfx? command,
+  }) {
     final previous = _state;
     final next = action(previous);
-    if (identical(next, previous)) return false;
+    if (identical(next, previous)) return;
     _state = next;
 
     final locked = !identical(next.board, previous.board);
     if (locked) _lockResets = 0;
     if (next.clearedRows.isNotEmpty) _clearCount++;
     if (next.status == GameStatus.over && previous.status != GameStatus.over) _recordScore();
-    _playHaptic(previous, next);
+    _feedback(previous, next, command);
 
     if (restartGravity || next.status != previous.status || next.level != previous.level) {
       _scheduleGravity();
     }
     _updateLockTimer(playerMoved: playerMoved);
     notifyListeners();
-    return true;
   }
 
-  /// Feedback only where it carries meaning: a drop landing, rows clearing
-  /// (stronger for four), and the game ending.
-  void _playHaptic(GameState previous, GameState next) {
-    if (!_hapticsEnabled()) return;
-    if (next.status == GameStatus.over && previous.status != GameStatus.over) {
-      HapticFeedback.heavyImpact();
-    } else if (next.clearedRows.length >= 4) {
-      HapticFeedback.heavyImpact();
-    } else if (next.clearedRows.isNotEmpty) {
-      HapticFeedback.mediumImpact();
+  /// Sound and haptics for one change, fired together on the frame it
+  /// happens and only where they carry meaning: the player's own rotate or
+  /// hard drop, then what the board did as a result. The biggest outcome
+  /// wins (game over, four lines, a new level, a clear, a piece settling).
+  void _feedback(GameState previous, GameState next, Sfx? command) {
+    final ended = next.status == GameStatus.over && previous.status != GameStatus.over;
+    final cleared = next.clearedRows.length;
+    final settled = !identical(next.board, previous.board);
+    final outcome = ended
+        ? Sfx.gameOver
+        : cleared >= 4
+        ? Sfx.clearFour
+        : next.level > previous.level
+        ? Sfx.levelUp
+        : cleared > 0
+        ? Sfx.clear
+        : settled && command == null
+        ? Sfx.lock
+        : null;
+
+    if (_soundEnabled()) {
+      if (command != null) _sounds?.play(command);
+      if (outcome != null) _sounds?.play(outcome);
+    }
+    if (_hapticsEnabled()) {
+      switch (outcome) {
+        case Sfx.gameOver || Sfx.clearFour:
+          HapticFeedback.heavyImpact();
+        case Sfx.levelUp || Sfx.clear:
+          HapticFeedback.mediumImpact();
+        case _ when command == Sfx.hardDrop:
+          HapticFeedback.lightImpact();
+        case _:
+      }
     }
   }
 

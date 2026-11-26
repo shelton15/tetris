@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tetris/game/audio/sound_effects.dart';
 import 'package:tetris/game/model/board.dart';
 import 'package:tetris/game/model/game.dart';
 import 'package:tetris/game/model/piece.dart';
@@ -30,6 +31,20 @@ class _OneLineGame extends Game {
 }
 
 GameViewModel scoringViewModel() => GameViewModel(game: _OneLineGame());
+
+/// Records what the game asked to play instead of playing it.
+class _RecordingSounds implements SoundEffects {
+  final played = <Sfx>[];
+
+  @override
+  void play(Sfx sfx) => played.add(sfx);
+
+  @override
+  Future<void> load() async {}
+
+  @override
+  Future<void> dispose() async {}
+}
 
 /// Pumps the screen with [vm]; tears both down at the end of the test so no
 /// gravity timer is left pending.
@@ -148,6 +163,44 @@ void main() {
       expect(vm.state.score, 100);
       vm.restart();
       expect(vm.state.score, 0);
+    });
+
+    testWidgets('sounds follow what each move did', (tester) async {
+      final sounds = _RecordingSounds();
+      final vm = GameViewModel(game: _OneLineGame(), sounds: sounds);
+      addTearDown(vm.dispose);
+
+      vm.moveLeft();
+      expect(sounds.played, isEmpty, reason: 'sliding is silent');
+      vm.rotate();
+      expect(sounds.played, [Sfx.rotate]);
+
+      sounds.played.clear();
+      vm.rotate(); // back to flat, so the drop below fills the row
+      sounds.played.clear();
+      vm.moveRight();
+      vm.hardDrop();
+      expect(sounds.played, [Sfx.hardDrop, Sfx.clear]);
+
+      sounds.played.clear();
+      landPiece(vm);
+      await tester.pump(GameViewModel.lockDelay);
+      expect(sounds.played, [Sfx.lock], reason: 'a piece settling on its own clacks');
+
+      sounds.played.clear();
+      while (vm.state.status != GameStatus.over) {
+        vm.hardDrop();
+      }
+      expect(sounds.played.last, Sfx.gameOver);
+    });
+
+    testWidgets('sound off plays nothing', (tester) async {
+      final sounds = _RecordingSounds();
+      final vm = GameViewModel(game: _OneLineGame(), sounds: sounds, soundEnabled: () => false);
+      addTearDown(vm.dispose);
+      vm.rotate();
+      vm.hardDrop();
+      expect(sounds.played, isEmpty);
     });
   });
 
@@ -326,11 +379,13 @@ void main() {
         ..themeMode = ThemeMode.dark
         ..showGhost = false
         ..haptics = false
+        ..sound = false
         ..controls = ControlScheme.buttons;
       final restored = await SettingsViewModel.load();
       expect(restored.themeMode, ThemeMode.dark);
       expect(restored.showGhost, isFalse);
       expect(restored.haptics, isFalse);
+      expect(restored.sound, isFalse);
       expect(restored.controls, ControlScheme.buttons);
     });
   });

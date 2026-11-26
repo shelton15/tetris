@@ -43,6 +43,9 @@ class SettingsScreen extends StatelessWidget {
 
   static const _ghostHint = 'Outline where the falling piece will land';
   static const _hapticsHint = 'Vibrate on drops, line clears and game over';
+  static const _soundHint = 'Effects for turns, drops, line clears and game over';
+  // iPhone's silent switch mutes the effects; say so, so silence never looks broken.
+  static const _soundHintApple = 'Drops and line clears. Silent mode mutes it.';
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +113,14 @@ class SettingsScreen extends StatelessWidget {
                     trailing: CupertinoSwitch(
                       value: settings.showGhost,
                       onChanged: (v) => settings.showGhost = v,
+                    ),
+                  ),
+                  CupertinoListTile(
+                    title: const Text('Sound'),
+                    subtitle: const Text(_soundHintApple),
+                    trailing: CupertinoSwitch(
+                      value: settings.sound,
+                      onChanged: (v) => settings.sound = v,
                     ),
                   ),
                   CupertinoListTile(
@@ -222,6 +233,12 @@ class SettingsScreen extends StatelessWidget {
             subtitle: const Text(_ghostHint),
             value: settings.showGhost,
             onChanged: (v) => settings.showGhost = v,
+          ),
+          SwitchListTile(
+            title: const Text('Sound'),
+            subtitle: const Text(_soundHint),
+            value: settings.sound,
+            onChanged: (v) => settings.sound = v,
           ),
           SwitchListTile(
             title: const Text('Haptics'),

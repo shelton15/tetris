@@ -13,13 +13,14 @@ enum ControlScheme {
 
 /// Player preferences, persisted on the device. Every change is saved
 /// immediately and broadcast to listeners (the app theme, the board, the
-/// game's haptics).
+/// game's sound and haptics).
 class SettingsViewModel extends ChangeNotifier {
   /// Defaults, not persisted. Used by [load] and by tests.
   SettingsViewModel({
     this._themeMode = ThemeMode.system,
     this._showGhost = true,
     this._haptics = true,
+    this._sound = true,
     this._controls = ControlScheme.gestures,
     this._prefs,
   });
@@ -33,6 +34,7 @@ class SettingsViewModel extends ChangeNotifier {
       themeMode: ThemeMode.values.firstWhere((m) => m.name == mode, orElse: () => ThemeMode.system),
       showGhost: prefs.getBool(_ghostKey) ?? true,
       haptics: prefs.getBool(_hapticsKey) ?? true,
+      sound: prefs.getBool(_soundKey) ?? true,
       controls: ControlScheme.values.firstWhere(
         (c) => c.name == prefs.getString(_controlsKey),
         orElse: () => ControlScheme.gestures,
@@ -44,17 +46,20 @@ class SettingsViewModel extends ChangeNotifier {
   static const _themeKey = 'theme_mode';
   static const _ghostKey = 'show_ghost';
   static const _hapticsKey = 'haptics';
+  static const _soundKey = 'sound';
   static const _controlsKey = 'controls';
 
   final SharedPreferences? _prefs;
   ThemeMode _themeMode;
   bool _showGhost;
   bool _haptics;
+  bool _sound;
   ControlScheme _controls;
 
   ThemeMode get themeMode => _themeMode;
   bool get showGhost => _showGhost;
   bool get haptics => _haptics;
+  bool get sound => _sound;
   ControlScheme get controls => _controls;
 
   set themeMode(ThemeMode value) {
@@ -75,6 +80,13 @@ class SettingsViewModel extends ChangeNotifier {
     if (value == _haptics) return;
     _haptics = value;
     _prefs?.setBool(_hapticsKey, value);
+    notifyListeners();
+  }
+
+  set sound(bool value) {
+    if (value == _sound) return;
+    _sound = value;
+    _prefs?.setBool(_soundKey, value);
     notifyListeners();
   }
 
